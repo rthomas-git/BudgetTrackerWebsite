@@ -1,0 +1,18 @@
+.max-h-\[300px\] {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--primary)) transparent;
+}
+
+.max-h-\[300px\]::-webkit-scrollbar {
+  width: 6px;
+}
+
+.max-h-\[300px\]::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.max-h-\[300px\]::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--primary));
+  border-radius: 3px;
+}
+
