@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -22,6 +22,35 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+
+// Define storage keys and utilities directly in this file
+const STORAGE_KEYS = {
+  GOALS: "budgetcraft-goals",
+}
+
+// Helper functions for localStorage
+const saveToStorage = <T,>(key: string, data: T): void => {
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(key, JSON.stringify(data))
+    } catch (error) {
+      console.error(`Error saving to localStorage (${key}):`, error)
+    }
+  }
+}
+
+const getFromStorage = <T,>(key: string, defaultValue: T): T => {
+  if (typeof window !== "undefined") {
+    try {
+      const storedValue = localStorage.getItem(key)
+      return storedValue ? JSON.parse(storedValue) : defaultValue
+    } catch (error) {
+      console.error(`Error retrieving from localStorage (${key}):`, error)
+      return defaultValue
+    }
+  }
+  return defaultValue
+}
 
 interface Goal {
   id: string
@@ -81,6 +110,19 @@ export function YearTimeline({ goals, setGoals }: YearTimelineProps) {
   })
   const [isAddingGoal, setIsAddingGoal] = useState(false)
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null)
+
+  // Load goals from localStorage on initial render
+  useEffect(() => {
+    const savedGoals = getFromStorage<MonthGoals>(STORAGE_KEYS.GOALS, {})
+    if (Object.keys(savedGoals).length > 0) {
+      setGoals(savedGoals)
+    }
+  }, [setGoals])
+
+  // Save goals to localStorage when they change
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.GOALS, goals)
+  }, [goals])
 
   const handleAddGoal = () => {
     if (newGoal.title) {
@@ -423,4 +465,3 @@ export function YearTimeline({ goals, setGoals }: YearTimelineProps) {
     </div>
   )
 }
-

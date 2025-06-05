@@ -52,4 +52,3 @@ const BudgetListEditor: React.FC = () => {
 }
 
 export default BudgetListEditor
-

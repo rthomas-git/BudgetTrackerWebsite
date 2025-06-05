@@ -1,4 +1,4 @@
-"\"use client"
+"use client"
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
@@ -13,6 +13,36 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label" // Import Label component
 import Masonry from "react-masonry-css"
 import "./NotesGrid.css"
+
+// Define storage keys and utilities directly in this file
+const STORAGE_KEYS = {
+  NOTES: "budgetcraft-notes",
+  TAGS: "budgetcraft-tags",
+}
+
+// Helper functions for localStorage
+const saveToStorage = <T,>(key: string, data: T): void => {
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(key, JSON.stringify(data))
+    } catch (error) {
+      console.error(`Error saving to localStorage (${key}):`, error)
+    }
+  }
+}
+
+const getFromStorage = <T,>(key: string, defaultValue: T): T => {
+  if (typeof window !== "undefined") {
+    try {
+      const storedValue = localStorage.getItem(key)
+      return storedValue ? JSON.parse(storedValue) : defaultValue
+    } catch (error) {
+      console.error(`Error retrieving from localStorage (${key}):`, error)
+      return defaultValue
+    }
+  }
+  return defaultValue
+}
 
 interface Note {
   id: number
@@ -62,22 +92,19 @@ export function Notepad() {
   const [editingTagName, setEditingTagName] = useState<string | null>(null)
 
   useEffect(() => {
-    const savedNotes = localStorage.getItem("notes")
-    const savedTags = localStorage.getItem("tags")
-    if (savedNotes) {
-      setNotes(JSON.parse(savedNotes))
-    }
-    if (savedTags) {
-      setTags(JSON.parse(savedTags))
-    }
+    const savedNotes = getFromStorage<Note[]>(STORAGE_KEYS.NOTES, [])
+    const savedTags = getFromStorage<string[]>(STORAGE_KEYS.TAGS, [])
+
+    setNotes(savedNotes)
+    setTags(savedTags)
   }, [])
 
   useEffect(() => {
-    localStorage.setItem("notes", JSON.stringify(notes))
+    saveToStorage(STORAGE_KEYS.NOTES, notes)
   }, [notes])
 
   useEffect(() => {
-    localStorage.setItem("tags", JSON.stringify(tags))
+    saveToStorage(STORAGE_KEYS.TAGS, tags)
   }, [tags])
 
   const addNote = () => {
@@ -652,4 +679,3 @@ function NoteCard({
     </Card>
   )
 }
-

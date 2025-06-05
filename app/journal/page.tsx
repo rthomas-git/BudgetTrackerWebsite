@@ -21,7 +21,7 @@ export default function JournalPage() {
       {/* Coming Soon Overlay */}
       <div className="absolute inset-0 bg-black/60 z-10 flex flex-col items-center justify-center rounded-lg">
         <h2 className="text-4xl font-bold text-white mb-2">Coming Soon</h2>
-        <p className="text-white/80 text-lg">We're working on something amazing!</p>
+        <p className="text-white/80 text-lg">We&apos;re working on something amazing!</p> {/* Escaped apostrophe */}
       </div>
 
       {/* Original content (dimmed by overlay) */}
@@ -71,4 +71,3 @@ export default function JournalPage() {
     </div>
   )
 }
-

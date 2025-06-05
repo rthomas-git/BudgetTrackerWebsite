@@ -12,4 +12,3 @@ export interface Note {
   checkboxItems?: Array<{ text: string; checked: boolean }>
   budgetList?: Array<{ key: string; value: string }>
 }
-

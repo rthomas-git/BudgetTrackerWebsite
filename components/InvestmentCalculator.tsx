@@ -69,8 +69,8 @@ export default function InvestmentCalculator() {
   ]
 
   return (
-    <div className="grid grid-cols-3 gap-6">
-      <Card className="col-span-1">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <Card className="lg:col-span-1">
         <CardHeader>
           <CardTitle>Investment Info</CardTitle>
         </CardHeader>
@@ -138,7 +138,7 @@ export default function InvestmentCalculator() {
         </CardContent>
       </Card>
 
-      <Card className="col-span-2">
+      <Card className="lg:col-span-2">
         <CardHeader>
           <CardTitle>Projected Investment Summary</CardTitle>
         </CardHeader>
@@ -162,7 +162,7 @@ export default function InvestmentCalculator() {
                 <span>{formatCurrency(accumulationSchedule[accumulationSchedule.length - 1]?.interest || 0)}</span>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div>
                 <h4 className="text-sm font-semibold mb-2">Annual Accumulation Schedule</h4>
                 <ScrollArea className="h-[200px]">
@@ -210,4 +210,3 @@ export default function InvestmentCalculator() {
     </div>
   )
 }
-

@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 
 export default function BudgetPlanner() {
-  const [budgets, setBudgets] = useState([
+  const [budgets /* setBudgets */] = useState([
+    // Removed setBudgets
     { category: "Food", amount: 500, spent: 300 },
     { category: "Transportation", amount: 200, spent: 150 },
     { category: "Entertainment", amount: 100, spent: 80 },
@@ -28,4 +29,3 @@ export default function BudgetPlanner() {
     </div>
   )
 }
-

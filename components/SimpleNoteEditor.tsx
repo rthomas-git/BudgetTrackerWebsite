@@ -28,4 +28,3 @@ const SimpleNoteEditor: React.FC<SimpleNoteEditorProps> = ({ note, onUpdate }) =
 }
 
 export default SimpleNoteEditor
-

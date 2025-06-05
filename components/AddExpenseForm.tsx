@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -27,8 +27,6 @@ interface AddExpenseFormProps {
   categories: string[]
 }
 
-const expenseCategories = ["Food", "Rent", "Utilities", "Transportation", "Entertainment"]
-
 export default function AddExpenseForm({ onAddExpense, categories }: AddExpenseFormProps) {
   const [open, setOpen] = useState(false)
   const [expenseCategory, setExpenseCategory] = useState("")
@@ -36,6 +34,19 @@ export default function AddExpenseForm({ onAddExpense, categories }: AddExpenseF
   const [errors, setErrors] = useState<{ [key: string]: string }>({})
   const { toast } = useToast()
   const { budgetCategories } = useBudgetContext()
+
+  // Ensure we're using the latest categories
+  useEffect(() => {
+    // This ensures that when new categories are added elsewhere in the app,
+    // they're immediately available in the dropdown
+    if (categories.length > 0 && !expenseCategory && categories[0]) {
+      setExpenseCategory(categories[0])
+    }
+
+    if (budgetCategories.length > 0 && !budgetCategory && budgetCategories[0]) {
+      setBudgetCategory(budgetCategories[0].name)
+    }
+  }, [categories, budgetCategories, expenseCategory, budgetCategory])
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -56,10 +67,13 @@ export default function AddExpenseForm({ onAddExpense, categories }: AddExpenseF
       return
     }
 
+    // Use today's date if no date is provided
+    const finalDate = date || new Date().toISOString().split("T")[0]
+
     onAddExpense({
       description,
       amount,
-      date: date || undefined,
+      date: finalDate,
       category: expenseCategory,
       budgetCategory,
       notes: notes || undefined,
@@ -72,6 +86,9 @@ export default function AddExpenseForm({ onAddExpense, categories }: AddExpenseF
 
     setOpen(false)
     setErrors({})
+
+    // Reset the form
+    event.currentTarget.reset()
     setExpenseCategory("")
     setBudgetCategory("")
   }
@@ -98,7 +115,7 @@ export default function AddExpenseForm({ onAddExpense, categories }: AddExpenseF
           </div>
           <div className="space-y-2">
             <Label htmlFor="date">Date (Optional)</Label>
-            <Input id="date" name="date" type="date" />
+            <Input id="date" name="date" type="date" defaultValue={new Date().toISOString().split("T")[0]} />
             {errors.date && <p className="text-red-500 text-sm">{errors.date}</p>}
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -147,4 +164,3 @@ export default function AddExpenseForm({ onAddExpense, categories }: AddExpenseF
     </Dialog>
   )
 }
-

@@ -71,4 +71,3 @@ const CheckboxNoteEditor: React.FC<CheckboxNoteEditorProps> = ({ note, onUpdate 
 }
 
 export default CheckboxNoteEditor
-

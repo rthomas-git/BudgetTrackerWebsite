@@ -6,7 +6,8 @@ import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 export default function RecurringTransactions() {
-  const [recurringTransactions, setRecurringTransactions] = useState([
+  const [recurringTransactions /* setRecurringTransactions */] = useState([
+    // Removed setRecurringTransactions
     { description: "Salary", amount: 3000, type: "income", frequency: "Monthly" },
     { description: "Rent", amount: 1000, type: "expense", frequency: "Monthly" },
     { description: "Netflix", amount: 15, type: "expense", frequency: "Monthly" },
@@ -42,4 +43,3 @@ export default function RecurringTransactions() {
     </div>
   )
 }
-

@@ -179,4 +179,3 @@ export default function Calculator({ onClose }: { onClose: () => void }) {
     </div>
   )
 }
-

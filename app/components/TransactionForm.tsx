@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 
 export default function TransactionForm() {
-  const [transactionType, setTransactionType] = useState("expense")
+  const [/* transactionType */ , setTransactionType] = useState("expense") // Removed transactionType
 
   return (
     <form className="space-y-4">
@@ -28,4 +28,3 @@ export default function TransactionForm() {
     </form>
   )
 }
-

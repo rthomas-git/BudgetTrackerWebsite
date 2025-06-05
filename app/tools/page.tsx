@@ -10,8 +10,14 @@ import Calculator from "@/components/Calculator"
 export default function ToolsPage() {
   const [showCalculator, setShowCalculator] = useState(false)
   return (
-    <div className="container mx-auto p-4 space-y-6 relative min-h-screen">
-      <Card>
+    <div className="w-full max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 relative min-h-screen">
+      {/* Coming Soon Overlay */}
+      <div className="absolute inset-0 bg-black/60 z-10 flex flex-col items-center justify-center rounded-lg">
+        <h2 className="text-4xl font-bold text-white mb-2">Coming Soon</h2>
+        <p className="text-white/80 text-lg">We&apos;re working on something amazing!</p>
+      </div>
+
+      <Card className="w-full">
         <CardHeader>
           <CardTitle>Investment Calculator</CardTitle>
         </CardHeader>
@@ -36,4 +42,3 @@ export default function ToolsPage() {
     </div>
   )
 }
-

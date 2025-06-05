@@ -84,4 +84,3 @@ export default function LoanCalculator({ onClose }: LoanCalculatorProps) {
     </Card>
   )
 }
-

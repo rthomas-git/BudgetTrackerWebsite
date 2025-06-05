@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 
 export default function SavingsGoals() {
-  const [goals, setGoals] = useState([
+  const [goals /* setGoals */] = useState([
+    // Removed setGoals
     { name: "Emergency Fund", target: 10000, current: 5000 },
     { name: "Vacation", target: 5000, current: 2000 },
     { name: "New Car", target: 20000, current: 8000 },
@@ -32,4 +33,3 @@ export default function SavingsGoals() {
     </div>
   )
 }
-

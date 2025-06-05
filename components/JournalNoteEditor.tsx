@@ -46,4 +46,3 @@ const JournalNoteEditor: React.FC<JournalNoteEditorProps> = ({ note, onUpdate })
 }
 
 export default JournalNoteEditor
-

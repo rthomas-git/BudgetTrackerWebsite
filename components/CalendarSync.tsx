@@ -102,4 +102,3 @@ export function CalendarSync({ goals }: CalendarSyncProps) {
     </>
   )
 }
-

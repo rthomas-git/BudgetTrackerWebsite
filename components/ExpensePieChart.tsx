@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { PieChart, Pie, Cell, ResponsiveContainer, Sector, Legend } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -12,11 +12,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useBudgetContext } from "@/contexts/BudgetContext"
 import type { Expense } from "./ExpenseList"
 import { Edit } from "lucide-react"
+import { useMediaQuery } from "@/hooks/use-media-query"
 
 const formatNumber = (num: number): string => {
   return num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+// Export these for backward compatibility, but they'll now be managed by context
 export const CATEGORY_COLORS = {
   Food: "#0088FE",
   Rent: "#00C49F",
@@ -25,7 +27,7 @@ export const CATEGORY_COLORS = {
   Entertainment: "#8884D8",
   Income: "#82ca9d",
   Remaining: "#D3D3D3",
-  "Over Budget": "#FF4136", // A bright red color
+  "Over Budget": "#FF4136",
 }
 
 export const BUDGET_COLORS = {
@@ -71,7 +73,7 @@ const renderLegend = (props: any) => {
   return (
     <ul className="list-none p-0">
       {payload.map((entry: any, index: number) => (
-        <li key={`item-${index}`} className="flex items-center mb-2">
+        <li key={`item-${entry.value}-${index}`} className="flex items-center mb-2">
           <span className="inline-block w-4 h-4 mr-2 rounded-sm" style={{ backgroundColor: entry.color }}></span>
           <span>{entry.value}</span>
         </li>
@@ -81,12 +83,26 @@ const renderLegend = (props: any) => {
 }
 
 export default function ExpensePieChart({ expenses }: ExpensePieChartProps) {
-  const { income, setIncome } = useBudgetContext()
+  const { income, setIncome, categoryColors, budgetColors } = useBudgetContext()
   const [isEditingIncome, setIsEditingIncome] = useState(false)
   const [newIncome, setNewIncome] = useState(income.toString())
   const [activeIndex, setActiveIndex] = useState(0)
+  const isMobile = useMediaQuery("(max-width: 768px)")
+  const [forceUpdate, setForceUpdate] = useState(0)
+
+  // This effect will run whenever expenses or colors change
+  useEffect(() => {
+    // Force a re-render of the chart
+    setForceUpdate((prev) => prev + 1)
+    console.log("ExpensePieChart: Forcing update due to expenses or colors change")
+  }, [expenses, categoryColors, budgetColors])
 
   const { totalExpenses, chartData } = useMemo(() => {
+    console.log("ExpensePieChart: Recalculating chart data")
+    console.log("Current expenses:", expenses)
+    console.log("Current categoryColors:", categoryColors)
+
+    // Create a fresh copy of the expenses by category
     const expensesByCategory = expenses.reduce(
       (acc, expense) => {
         if (expense.category in acc) {
@@ -98,6 +114,8 @@ export default function ExpensePieChart({ expenses }: ExpensePieChartProps) {
       },
       {} as Record<string, number>,
     )
+
+    console.log("Expenses by category:", expensesByCategory)
 
     const total = Object.values(expensesByCategory).reduce((sum, amount) => sum + amount, 0)
     const remaining = income - total
@@ -120,12 +138,13 @@ export default function ExpensePieChart({ expenses }: ExpensePieChartProps) {
         name: "Over Budget",
         value: Math.abs(remaining),
         percentage: (Math.abs(remaining) / income) * 100,
-        fill: CATEGORY_COLORS["Over Budget"], // Add this line
+        fill: categoryColors["Over Budget"] || "#FF4136",
       })
     }
 
+    console.log("Chart data:", data)
     return { totalExpenses: total, chartData: data }
-  }, [expenses, income])
+  }, [expenses, income, forceUpdate, categoryColors])
 
   const remainingIncome = income - totalExpenses
 
@@ -143,21 +162,21 @@ export default function ExpensePieChart({ expenses }: ExpensePieChartProps) {
   }
 
   return (
-    <div className="flex">
-      <div className="w-1/3 pr-4 flex flex-col justify-center">
+    <div className={`flex flex-col ${isMobile ? "" : "md:flex-row"}`}>
+      <div className={`${isMobile ? "w-full" : "w-1/3 pr-4"} flex flex-col justify-center mb-4 md:mb-0`}>
         <Card className="mb-4 bg-card dark:bg-black">
-          <CardHeader>
-            <CardTitle>Income</CardTitle>
+          <CardHeader className="p-3 md:p-4">
+            <CardTitle className="text-base md:text-lg">Income</CardTitle>
           </CardHeader>
-          <CardContent className="relative">
-            <p className="text-2xl font-bold">${formatNumber(income)}</p>
+          <CardContent className="p-3 md:p-4 pt-0 relative">
+            <p className="text-xl md:text-2xl font-bold">${formatNumber(income)}</p>
             <Dialog open={isEditingIncome} onOpenChange={setIsEditingIncome}>
               <DialogTrigger asChild>
                 <Button variant="ghost" size="icon" className="absolute bottom-2 right-2">
                   <Edit className="h-4 w-4" />
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                   <DialogTitle>Edit Income</DialogTitle>
                 </DialogHeader>
@@ -180,20 +199,20 @@ export default function ExpensePieChart({ expenses }: ExpensePieChartProps) {
           </CardContent>
         </Card>
         <Card className="mb-4 bg-card dark:bg-black">
-          <CardHeader>
-            <CardTitle>Expenses</CardTitle>
+          <CardHeader className="p-3 md:p-4">
+            <CardTitle className="text-base md:text-lg">Expenses</CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-red-600">${formatNumber(totalExpenses)}</p>
+          <CardContent className="p-3 md:p-4 pt-0">
+            <p className="text-xl md:text-2xl font-bold text-red-600">${formatNumber(totalExpenses)}</p>
           </CardContent>
         </Card>
         <Card className="bg-card dark:bg-black">
-          <CardHeader>
-            <CardTitle>{remainingIncome >= 0 ? "Remaining" : "Over Budget"}</CardTitle>
+          <CardHeader className="p-3 md:p-4">
+            <CardTitle className="text-base md:text-lg">{remainingIncome >= 0 ? "Remaining" : "Over Budget"}</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 md:p-4 pt-0">
             <p
-              className={`text-2xl font-bold ${
+              className={`text-xl md:text-2xl font-bold ${
                 remainingIncome > 200 ? "text-green-600" : remainingIncome >= 0 ? "text-yellow-400" : "text-red-600"
               }`}
             >
@@ -202,30 +221,40 @@ export default function ExpensePieChart({ expenses }: ExpensePieChartProps) {
           </CardContent>
         </Card>
       </div>
-      <div className="w-2/3 h-[500px] relative">
+      <div className={`${isMobile ? "w-full h-[300px]" : "w-2/3 h-[500px]"} relative`}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
+              key={`pie-${forceUpdate}`}
               activeIndex={activeIndex}
               activeShape={renderActiveShape}
               data={chartData}
               cx="50%"
               cy="50%"
-              innerRadius={120}
-              outerRadius={160}
+              innerRadius={isMobile ? 70 : 120}
+              outerRadius={isMobile ? 100 : 160}
               fill="#8884d8"
               dataKey="value"
               onMouseEnter={onPieEnter}
             >
               {chartData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.fill || CATEGORY_COLORS[entry.name] || "#000000"} />
+                <Cell
+                  key={`cell-${entry.name}-${index}-${forceUpdate}`}
+                  fill={entry.fill || categoryColors[entry.name] || "#000000"}
+                />
               ))}
             </Pie>
-            <Legend layout="vertical" align="right" verticalAlign="middle" content={renderLegend} />
+            <Legend
+              key={`legend-${forceUpdate}`}
+              layout="vertical"
+              align="right"
+              verticalAlign="middle"
+              content={renderLegend}
+              wrapperStyle={isMobile ? { fontSize: "12px" } : {}}
+            />
           </PieChart>
         </ResponsiveContainer>
       </div>
     </div>
   )
 }
-

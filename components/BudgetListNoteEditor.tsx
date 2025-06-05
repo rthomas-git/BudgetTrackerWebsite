@@ -65,4 +65,3 @@ const BudgetListNoteEditor: React.FC<BudgetListNoteEditorProps> = ({ note, onUpd
 }
 
 export default BudgetListNoteEditor
-

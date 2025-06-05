@@ -11,4 +11,3 @@ interface Goal {
 }
 
 export type { Goal }
-

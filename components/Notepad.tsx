@@ -45,4 +45,3 @@ export function Notepad({ notes, onEdit, onDelete }: NotepadProps) {
     </ScrollArea>
   )
 }
-

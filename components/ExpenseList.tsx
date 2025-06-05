@@ -1,42 +1,25 @@
 "use client"
 
+import { DialogDescription } from "@/components/ui/dialog"
+
 import type React from "react"
 
-import { useState } from "react"
-import { Table, TableBody, TableCell, TableHead, TableRow, TableHeader } from "@/components/ui/table"
+import { useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CATEGORY_COLORS, BUDGET_COLORS } from "./ExpensePieChart"
 import { useBudgetContext } from "@/contexts/BudgetContext"
-import {
-  ChevronUp,
-  ChevronDown,
-  FileText,
-  MoreHorizontal,
-  Trash2,
-  Upload,
-  Filter,
-  Plus,
-  Edit,
-  Check,
-} from "lucide-react"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { ChevronUp, ChevronDown, MoreHorizontal, Trash2, Filter, Plus, Edit, Check } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import "./ExpenseList.css"
+import { useMediaQuery } from "@/hooks/use-media-query"
+import { Card, CardContent } from "@/components/ui/card"
+import { toast } from "@/components/ui/use-toast"
+import { TableRow } from "@/components/ui/table"
 
 const formatNumber = (num: number): string => {
   return num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -52,6 +35,7 @@ export interface Expense {
   notes?: string
 }
 
+// Update the ExpenseListProps interface to include the activeTab prop
 interface ExpenseListProps {
   expenses: Expense[]
   onUpdateExpense: (updatedExpense: Expense) => void
@@ -61,6 +45,7 @@ interface ExpenseListProps {
   highlightCategory: "expense" | "budget"
   categories: string[]
   onCategoryChange: (categories: string[]) => void
+  activeTab?: "spending" | "budget" // Make it optional for backward compatibility
 }
 
 const colorPalette = [
@@ -78,6 +63,90 @@ const colorPalette = [
   "#9575CD",
 ]
 
+// Mobile expense card component
+function ExpenseCard({
+  expense,
+  index,
+  highlightCategory,
+  onEdit,
+  onMoveUp,
+  onMoveDown,
+  isFirst,
+  isLast,
+  categoryColors,
+  budgetColors,
+}: {
+  expense: Expense
+  index: number
+  highlightCategory: "expense" | "budget"
+  onEdit: () => void
+  onMoveUp: () => void
+  onMoveDown: () => void
+  isFirst: boolean
+  isLast: boolean
+  categoryColors: { [key: string]: string }
+  budgetColors: { [key: string]: string }
+}) {
+  return (
+    <Card className="mb-2" onClick={onEdit}>
+      <CardContent className="p-3">
+        <div className="flex justify-between items-start mb-2">
+          <div>
+            <h3 className="font-medium text-sm">{expense.description}</h3>
+            <p className="text-xs text-muted-foreground">{expense.date}</p>
+          </div>
+          <div className="flex flex-col">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={(e) => {
+                e.stopPropagation()
+                onMoveUp()
+              }}
+              disabled={isFirst}
+              className="h-6 w-6"
+            >
+              <ChevronUp className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={(e) => {
+                e.stopPropagation()
+                onMoveDown()
+              }}
+              disabled={isLast}
+              className="h-6 w-6"
+            >
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+        <div className="flex justify-between items-center">
+          <Badge
+            variant="outline"
+            style={{
+              backgroundColor:
+                highlightCategory === "expense"
+                  ? categoryColors[expense.category] || "#CCCCCC"
+                  : budgetColors[expense.budgetCategory] || "#CCCCCC",
+              color: "#000000",
+              borderColor:
+                highlightCategory === "expense"
+                  ? categoryColors[expense.category] || "#CCCCCC"
+                  : budgetColors[expense.budgetCategory] || "#CCCCCC",
+            }}
+          >
+            {highlightCategory === "expense" ? expense.category : expense.budgetCategory}
+          </Badge>
+          <span className="font-semibold text-red-600">${formatNumber(expense.amount)}</span>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+// Then update the function signature to destructure the new prop
 export default function ExpenseList({
   expenses,
   onUpdateExpense,
@@ -87,14 +156,114 @@ export default function ExpenseList({
   highlightCategory,
   categories,
   onCategoryChange,
+  activeTab = "spending", // Default value for backward compatibility
 }: ExpenseListProps) {
+  // Add this at the beginning of the ExpenseList component, right after the props destructuring
+  console.log("ExpenseList received expenses:", expenses)
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
   const {
     budgetCategories = [],
     setBudgetCategories,
-    spendingCategories = [],
+    spendingCategories: contextSpendingCategories = [],
     setSpendingCategories,
+    income = 0,
+    categoryColors,
+    budgetColors,
+    updateCategoryColor,
+    updateBudgetColor,
   } = useBudgetContext()
+
+  // Add a state to track if we need to force update
+  const [forceUpdate, setForceUpdate] = useState(0)
+
+  // Keep a local copy of expenses for comparison
+  const [localExpenses, setLocalExpenses] = useState<Expense[]>([])
+
+  // Update local expenses when props change
+  useEffect(() => {
+    setLocalExpenses(expenses)
+  }, [expenses])
+
+  // Ensure we have default spending categories if none are provided from context
+  const [spendingCategories, setLocalSpendingCategories] = useState(() => {
+    if (contextSpendingCategories && contextSpendingCategories.length > 0) {
+      return contextSpendingCategories
+    }
+
+    // Default categories with colors
+    return [
+      { name: "Food", color: "#FF6B6B" },
+      { name: "Rent", color: "#4ECDC4" },
+      { name: "Transportation", color: "#45B7D1" },
+      { name: "Utilities", color: "#FFA07A" },
+      { name: "Entertainment", color: "#98D8C8" },
+    ]
+  })
+
+  // Update the setSpendingCategories function to also update colors in context
+  const updateSpendingCategories = (newCategories, oldCategories = spendingCategories) => {
+    console.log("Updating spending categories:", { newCategories, oldCategories })
+
+    // Check for category name changes
+    const nameChanges = {}
+
+    // Loop through old categories and check if names have changed
+    oldCategories.forEach((oldCat) => {
+      const newCat = newCategories.find(
+        (cat) =>
+          // If we find a category with the same index but different name
+          cat.color === oldCat.color && cat.name !== oldCat.name,
+      )
+
+      if (newCat) {
+        console.log(`Category name changed: ${oldCat.name} -> ${newCat.name}`)
+        nameChanges[oldCat.name] = newCat.name
+      }
+    })
+
+    // If there are name changes, update all expenses with the old category names
+    if (Object.keys(nameChanges).length > 0) {
+      console.log("Updating expenses with new category names:", nameChanges)
+
+      const updatedExpenses = expenses.map((expense) => {
+        if (nameChanges[expense.category]) {
+          console.log(`Updating expense category: ${expense.category} -> ${nameChanges[expense.category]}`)
+          return { ...expense, category: nameChanges[expense.category] }
+        }
+        return expense
+      })
+
+      // Update expenses
+      onReorderExpenses(updatedExpenses)
+
+      // Update colors in context for old->new name mappings
+      Object.entries(nameChanges).forEach(([oldName, newName]) => {
+        const oldColor = categoryColors[oldName]
+        if (oldColor) {
+          updateCategoryColor(newName, oldColor)
+        }
+      })
+    }
+
+    // Update the context state
+    setSpendingCategories(newCategories)
+    // Update the local state
+    setLocalSpendingCategories(newCategories)
+
+    // Update colors in context for all categories
+    newCategories.forEach((category) => {
+      if (category.name && category.color) {
+        updateCategoryColor(category.name, category.color)
+      }
+    })
+
+    // Show a confirmation toast
+    toast({
+      title: "Categories updated",
+      description: "Your spending categories have been saved.",
+    })
+  }
+
   const [hoveredRow, setHoveredRow] = useState<number | null>(null)
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
@@ -117,6 +286,8 @@ export default function ExpenseList({
   const [newBudgetCategoryColor, setNewBudgetCategoryColor] = useState(colorPalette[0])
   const [importDialogOpen, setImportDialogOpen] = useState(false)
 
+  const isMobile = useMediaQuery("(max-width: 768px)")
+
   const handleEditSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!editingExpense) return
@@ -134,6 +305,14 @@ export default function ExpenseList({
 
     onUpdateExpense(updatedExpense)
     setEditingExpense(null)
+  }
+
+  const handleDeleteExpense = () => {
+    if (editingExpense) {
+      const updatedExpenses = expenses.filter((expense) => expense.id !== editingExpense.id)
+      onReorderExpenses(updatedExpenses)
+      setEditingExpense(null)
+    }
   }
 
   const moveExpense = (index: number, direction: "up" | "down") => {
@@ -156,9 +335,9 @@ export default function ExpenseList({
 
   const getBadgeStyle = (color: string) => {
     return {
-      backgroundColor: color,
+      backgroundColor: color || "#CCCCCC",
       color: "#000000",
-      borderColor: color,
+      borderColor: color || "#CCCCCC",
       transition: "all 0.3s ease-in-out",
     }
   }
@@ -195,7 +374,14 @@ export default function ExpenseList({
       expense.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
       expense.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
       expense.budgetCategory.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesCategory = appliedFilters.category === "All" || expense.category === appliedFilters.category
+
+    // Update this line to check the appropriate category field based on highlightCategory
+    const matchesCategory =
+      appliedFilters.category === "All" ||
+      (highlightCategory === "expense"
+        ? expense.category === appliedFilters.category
+        : expense.budgetCategory === appliedFilters.category)
+
     const matchesMinAmount = !appliedFilters.minAmount || expense.amount >= Number.parseFloat(appliedFilters.minAmount)
     const matchesMaxAmount = !appliedFilters.maxAmount || expense.amount <= Number.parseFloat(appliedFilters.maxAmount)
     return matchesSearch && matchesCategory && matchesMinAmount && matchesMaxAmount
@@ -211,34 +397,68 @@ export default function ExpenseList({
   const handleAddCategory = (type: "spending" | "budget") => {
     if (type === "spending") {
       if (newSpendingCategoryName && newSpendingCategoryColor) {
-        setSpendingCategories([
+        const newCategories = [
           ...spendingCategories,
           { name: newSpendingCategoryName, color: newSpendingCategoryColor },
-        ])
-        CATEGORY_COLORS[newSpendingCategoryName] = newSpendingCategoryColor
+        ]
+        updateSpendingCategories(newCategories)
+
+        // Add to categories list for dropdown
+        if (!categories.includes(newSpendingCategoryName)) {
+          onCategoryChange([...categories, newSpendingCategoryName])
+        }
+
         setNewSpendingCategoryName("")
         setNewSpendingCategoryColor(colorPalette[0])
+      } else {
+        // Show an error or alert if name is missing
+        if (!newSpendingCategoryName) {
+          alert("Please enter a category name")
+        }
       }
     } else {
       if (newBudgetCategoryName && newBudgetCategoryColor && newBudgetCategoryPercentage) {
-        const newPercentage = Number.parseFloat(newBudgetCategoryPercentage)
-        const currentTotal = budgetCategories.reduce((sum, cat) => sum + cat.percentage, 0)
-        if (currentTotal + newPercentage <= 100) {
-          setBudgetCategories([
-            ...budgetCategories,
-            {
-              name: newBudgetCategoryName,
-              color: newBudgetCategoryColor,
-              percentage: newPercentage,
-              spent: 0,
-            },
-          ])
-          BUDGET_COLORS[newBudgetCategoryName] = newBudgetCategoryColor
+        // Allow "." as input but treat it as 0 for calculations
+        const newAmount = newBudgetCategoryPercentage === "." ? 0 : Number.parseFloat(newBudgetCategoryPercentage) || 0
+
+        // Calculate percentage based on amount
+        const newPercentage = (newAmount / income) * 100
+
+        const currentTotal = budgetCategories.reduce((sum, cat) => {
+          let catAmount = 0
+          if (typeof cat.amount === "string") {
+            if (cat.amount === ".") {
+              catAmount = 0
+            } else {
+              catAmount = Number.parseFloat(cat.amount)
+              if (isNaN(catAmount)) catAmount = 0
+            }
+          } else if (typeof cat.amount === "number") {
+            catAmount = cat.amount
+          } else {
+            // If amount is not defined, calculate from percentage
+            catAmount = (cat.percentage / 100) * income
+          }
+          return sum + catAmount
+        }, 0)
+
+        if (currentTotal + newAmount <= income) {
+          const newCategory = {
+            name: newBudgetCategoryName,
+            color: newBudgetCategoryColor,
+            amount: newBudgetCategoryPercentage, // Store the raw input for amount
+            percentage: newPercentage, // Store the calculated percentage
+            spent: 0,
+          }
+
+          setBudgetCategories([...budgetCategories, newCategory])
+          updateBudgetColor(newBudgetCategoryName, newBudgetCategoryColor)
+
           setNewBudgetCategoryName("")
           setNewBudgetCategoryColor(colorPalette[0])
           setNewBudgetCategoryPercentage("")
         } else {
-          alert("Total percentage cannot exceed 100%")
+          alert("Total budget allocation cannot exceed income")
         }
       }
     }
@@ -246,23 +466,132 @@ export default function ExpenseList({
 
   const handleDeleteCategory = (type: "spending" | "budget", name: string) => {
     if (type === "spending") {
-      setSpendingCategories(spendingCategories.filter((cat) => cat.name !== name))
-      delete CATEGORY_COLORS[name]
+      const newCategories = spendingCategories.filter((cat) => cat.name !== name)
+      updateSpendingCategories(newCategories)
     } else {
       setBudgetCategories(budgetCategories.filter((cat) => cat.name !== name))
-      delete BUDGET_COLORS[name]
     }
   }
 
+  // This is the key function that needs to be fixed
   const handleUpdateBudgetCategory = (index: number, updatedCategory: any) => {
     const newCategories = [...budgetCategories]
+
+    // Check if the category name has changed - make this more explicit
+    const oldCategory = newCategories[index]
+    const nameChanged = oldCategory.name !== updatedCategory.name
+
+    console.log("Budget category update:", {
+      oldName: oldCategory.name,
+      newName: updatedCategory.name,
+      nameChanged,
+    })
+
+    // Store the raw input value
     newCategories[index] = updatedCategory
-    const totalPercentage = newCategories.reduce((sum, cat) => sum + cat.percentage, 0)
-    if (totalPercentage <= 100) {
+
+    // Calculate total allocated amount
+    const totalAmount = newCategories.reduce((sum, cat) => {
+      let catAmount = 0
+
+      if (typeof cat.amount === "string") {
+        if (cat.amount === ".") {
+          catAmount = 0
+        } else {
+          catAmount = Number.parseFloat(cat.amount)
+          if (isNaN(catAmount)) catAmount = 0
+        }
+      } else if (typeof cat.amount === "number") {
+        catAmount = cat.amount
+      } else {
+        // If amount is not defined, calculate from percentage
+        catAmount = (cat.percentage / 100) * income
+      }
+
+      return sum + catAmount
+    }, 0)
+
+    if (totalAmount <= income) {
+      // If the name has changed, update all expenses with the old category name
+      if (nameChanged) {
+        console.log("Updating expenses with new budget category name:", oldCategory.name, "->", updatedCategory.name)
+
+        // Create a new array of expenses with the updated budget category name
+        const updatedExpenses = expenses.map((expense) => {
+          if (expense.budgetCategory === oldCategory.name) {
+            console.log(
+              `Updating expense: ${expense.description} from ${expense.budgetCategory} to ${updatedCategory.name}`,
+            )
+            // Create a new expense object with the updated budget category
+            return { ...expense, budgetCategory: updatedCategory.name }
+          }
+          return expense
+        })
+
+        // Log the updated expenses for debugging
+        console.log("Original expenses:", expenses)
+        console.log("Updated expenses:", updatedExpenses)
+
+        // Update expenses in the parent component
+        onReorderExpenses(updatedExpenses)
+
+        // Update budget colors in context
+        if (oldCategory.name && updatedCategory.name) {
+          updateBudgetColor(updatedCategory.name, updatedCategory.color)
+        }
+
+        // Force a re-render
+        setForceUpdate((prev) => prev + 1)
+      }
+
       setBudgetCategories(newCategories)
-      BUDGET_COLORS[updatedCategory.name] = updatedCategory.color
+      if (updatedCategory.name) {
+        updateBudgetColor(updatedCategory.name, updatedCategory.color)
+      }
+
+      // Notify the user about the current allocation
+      const totalPercentage = (totalAmount / income) * 100
+      if (totalAmount < income) {
+        toast({
+          title: nameChanged ? "Category renamed and updated" : "Category updated",
+          description: `Total allocation is now $${totalAmount.toFixed(2)} (${totalPercentage.toFixed(1)}%)`,
+        })
+      } else {
+        toast({
+          title: nameChanged ? "Category renamed and updated" : "Category updated",
+          description: "Total allocation is now 100% of income",
+        })
+      }
+
+      // If name changed, force another update after a short delay
+      if (nameChanged) {
+        setTimeout(() => {
+          // Force another update to ensure the UI reflects the changes
+          setForceUpdate((prev) => prev + 1)
+
+          // Double-check that expenses were updated correctly
+          const checkExpenses = expenses.filter((expense) => expense.budgetCategory === oldCategory.name)
+          if (checkExpenses.length > 0) {
+            console.log("Found expenses still using old category name:", checkExpenses)
+
+            // Try updating expenses again
+            const fixedExpenses = expenses.map((expense) => {
+              if (expense.budgetCategory === oldCategory.name) {
+                return { ...expense, budgetCategory: updatedCategory.name }
+              }
+              return expense
+            })
+
+            onReorderExpenses(fixedExpenses)
+          }
+        }, 100)
+      }
     } else {
-      alert("Total percentage cannot exceed 100%")
+      toast({
+        title: "Error",
+        description: "Total budget allocation cannot exceed income",
+        variant: "destructive",
+      })
     }
   }
 
@@ -274,7 +603,7 @@ export default function ExpenseList({
       <PopoverTrigger asChild>
         <Button variant="outline" className="w-[100px] p-0">
           <div className="w-full h-full flex items-center justify-between px-2">
-            <div className="w-6 h-6 rounded-md" style={{ backgroundColor: selectedColor }} />
+            <div className="w-6 h-6 rounded-md" style={{ backgroundColor: selectedColor || "#CCCCCC" }} />
             <ChevronDown className="h-4 w-4" />
           </div>
         </Button>
@@ -289,7 +618,7 @@ export default function ExpenseList({
               style={{ backgroundColor: color }}
               onClick={() => onColorChange(color)}
             >
-              {color.toLowerCase() === selectedColor.toLowerCase() && (
+              {color && selectedColor && color.toLowerCase() === selectedColor.toLowerCase() && (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <Check className="h-6 w-6 text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]" />
                 </div>
@@ -301,486 +630,568 @@ export default function ExpenseList({
     </Popover>
   )
 
+  useEffect(() => {
+    setFilterCategory("All")
+    setAppliedFilters({
+      ...appliedFilters,
+      category: "All",
+    })
+  }, [highlightCategory])
+
+  // Add this useEffect to force a re-render when expenses change
+  useEffect(() => {
+    // This effect will run whenever expenses change
+    console.log("Expenses updated:", expenses)
+  }, [expenses, budgetCategories, searchTerm, appliedFilters, highlightCategory, forceUpdate])
+
+  // Add a specific effect to force re-render when budget categories change
+  useEffect(() => {
+    if (highlightCategory === "budget") {
+      console.log("Budget categories changed, forcing re-render of expenses table")
+      // Force a re-render by incrementing the forceUpdate counter
+      setForceUpdate((prev) => prev + 1)
+    }
+  }, [budgetCategories, highlightCategory])
+
+  // Add this effect to check if expenses need updating when budget categories change
+  useEffect(() => {
+    // Check if any expenses have budget categories that don't exist anymore
+    const needsUpdate = expenses.some((expense) => {
+      return !budgetCategories.some((cat) => cat.name === expense.budgetCategory)
+    })
+
+    if (needsUpdate) {
+      console.log("Found expenses with outdated budget categories, updating...")
+
+      // Update expenses with valid budget categories
+      const updatedExpenses = expenses.map((expense) => {
+        const categoryExists = budgetCategories.some((cat) => cat.name === expense.budgetCategory)
+
+        if (!categoryExists && budgetCategories.length > 0) {
+          // Use the first available budget category
+          return { ...expense, budgetCategory: budgetCategories[0].name }
+        }
+
+        return expense
+      })
+
+      onReorderExpenses(updatedExpenses)
+    }
+  }, [budgetCategories])
+
   return (
     <>
-      <div className="flex justify-between items-center py-4 px-6">
-        <h2 className="text-2xl font-bold">Expenses</h2>
-        <div className="flex items-center space-x-2">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center py-2 md:py-4 px-2 md:px-6">
+        <h2 className="text-xl md:text-2xl font-bold mb-2 md:mb-0">Expenses</h2>
+        <div className="flex flex-col md:flex-row items-start md:items-center space-y-2 md:space-y-0 md:space-x-2 w-full md:w-auto">
+          <Dialog open={isEditCategoryOpen} onOpenChange={setIsEditCategoryOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className="mr-2 mb-2 md:mb-0">
+                <Plus className="h-4 w-4 mr-1" />
+                Add Category
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[700px] h-[80vh] flex flex-col">
+              {/* Keep the existing dialog content */}
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-bold">Manage Categories</DialogTitle>
+              </DialogHeader>
+              <div className="grid grid-cols-2 gap-8 flex-grow overflow-hidden">
+                <div className="overflow-y-auto pr-2 h-full flex flex-col">
+                  <h3 className="font-semibold mb-4 text-lg sticky top-0 bg-background z-10 py-2">
+                    Spending Categories
+                  </h3>
+                  <div className="space-y-4 flex-grow overflow-y-auto">
+                    {spendingCategories.map((category, index) => (
+                      <div key={index} className="flex items-center space-x-2 bg-secondary p-2 rounded-md">
+                        {editingCategoryId === `spending-${index}` ? (
+                          <>
+                            <Input
+                              value={category.name}
+                              onChange={(e) => {
+                                const updatedCategories = [...spendingCategories]
+                                const oldName = updatedCategories[index].name
+                                updatedCategories[index].name = e.target.value
+
+                                // Update expenses with the new category name
+                                if (oldName !== e.target.value) {
+                                  const updatedExpenses = expenses.map((expense) => {
+                                    if (expense.category === oldName) {
+                                      return { ...expense, category: e.target.value }
+                                    }
+                                    return expense
+                                  })
+
+                                  // Update colors in context
+                                  if (categoryColors[oldName]) {
+                                    updateCategoryColor(e.target.value, categoryColors[oldName])
+                                  }
+
+                                  // Update expenses
+                                  onReorderExpenses(updatedExpenses)
+                                }
+
+                                // Update categories
+                                updateSpendingCategories(updatedCategories)
+                              }}
+                              className="flex-grow"
+                            />
+                            <ColorPicker
+                              selectedColor={category.color || "#CCCCCC"}
+                              onColorChange={(color) => {
+                                const updatedCategories = [...spendingCategories]
+                                updatedCategories[index].color = color
+                                updateSpendingCategories(updatedCategories)
+                                if (category.name) {
+                                  updateCategoryColor(category.name, color)
+                                }
+                              }}
+                            />
+                            <Button variant="ghost" size="sm" onClick={() => setEditingCategoryId(null)}>
+                              <Check className="h-4 w-4" />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <div className="w-4 h-4 rounded-md" style={{ backgroundColor: category.color }}></div>
+                            <span className="flex-grow">{category.name}</span>
+                            <Button variant="ghost" size="sm" onClick={() => setEditingCategoryId(`spending-${index}`)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteCategory("spending", category.name)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="sticky bottom-0 bg-background pt-4 border-t mt-4">
+                    <h3 className="font-semibold mb-4 text-lg">Add New Category</h3>
+                    <div className="mt-4 flex items-center gap-4">
+                      <Input
+                        placeholder="New Category"
+                        value={newSpendingCategoryName}
+                        onChange={(e) => setNewSpendingCategoryName(e.target.value)}
+                        className="flex-grow"
+                      />
+                      <ColorPicker
+                        selectedColor={newSpendingCategoryColor}
+                        onColorChange={setNewSpendingCategoryColor}
+                      />
+                    </div>
+                    <Button onClick={() => handleAddCategory("spending")} className="mt-2 w-full">
+                      Add Spending Category
+                    </Button>
+                  </div>
+                </div>
+                <div className="overflow-y-auto pr-2 h-full flex flex-col">
+                  <h3 className="font-semibold mb-4 text-lg sticky top-0 bg-background z-10 py-2">Budget Categories</h3>
+                  <div className="space-y-4 flex-grow overflow-y-auto">
+                    {budgetCategories.map((category, index) => (
+                      <div key={index} className="flex items-center space-x-2 bg-secondary p-2 rounded-md">
+                        {editingCategoryId === `budget-${index}` ? (
+                          <>
+                            <div className="flex flex-col space-y-2 w-full">
+                              <div className="flex items-center space-x-2">
+                                <Input
+                                  value={category.name}
+                                  onChange={(e) => {
+                                    const updatedCategories = [...budgetCategories]
+                                    const oldName = updatedCategories[index].name
+                                    updatedCategories[index].name = e.target.value
+
+                                    // Create a new updated category object
+                                    const updatedCategory = {
+                                      ...category,
+                                      name: e.target.value,
+                                    }
+
+                                    // Update the budget category with the new name
+                                    handleUpdateBudgetCategory(index, updatedCategory)
+                                  }}
+                                  className="flex-grow"
+                                  placeholder="Category Name"
+                                />
+                                <ColorPicker
+                                  selectedColor={category.color}
+                                  onColorChange={(color) => {
+                                    const updatedCategory = { ...category, color: color }
+                                    handleUpdateBudgetCategory(index, updatedCategory)
+                                  }}
+                                />
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Input
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={
+                                    typeof category.amount === "undefined"
+                                      ? category.percentage.toString()
+                                      : category.amount.toString()
+                                  }
+                                  onChange={(e) => {
+                                    const value = e.target.value.replace(/[^0-9.]/g, "")
+
+                                    // Calculate percentage based on amount
+                                    const amount = value === "" || value === "." ? 0 : Number(value)
+                                    const percentage = (amount / income) * 100
+
+                                    // Allow any input including just "."
+                                    const updatedCategory = {
+                                      ...category,
+                                      amount: value,
+                                      percentage: percentage,
+                                    }
+                                    handleUpdateBudgetCategory(index, updatedCategory)
+                                  }}
+                                  className="w-full"
+                                  placeholder="Amount"
+                                />
+                                <Button variant="ghost" size="sm" onClick={() => setEditingCategoryId(null)}>
+                                  <Check className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="w-4 h-4 rounded-md" style={{ backgroundColor: category.color }}></div>
+                            <span className="flex-grow">{category.name}</span>
+                            <span className="mr-2">
+                              $
+                              {typeof category.amount !== "undefined"
+                                ? typeof category.amount === "string"
+                                  ? category.amount
+                                  : formatNumber(category.amount)
+                                : formatNumber((category.percentage / 100) * income)}{" "}
+                              ({category.percentage.toFixed(1)}%)
+                            </span>
+                            <Button variant="ghost" size="sm" onClick={() => setEditingCategoryId(`budget-${index}`)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteCategory("budget", category.name)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="sticky bottom-0 bg-background pt-4 border-t mt-4">
+                    <h3 className="font-semibold mb-4 text-lg">Add New Category</h3>
+                    <div className="mt-4 flex items-center gap-4">
+                      <Input
+                        placeholder="New Category"
+                        value={newBudgetCategoryName}
+                        onChange={(e) => setNewBudgetCategoryName(e.target.value)}
+                        className="flex-grow"
+                      />
+                      <div className="flex items-center w-24 relative">
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="0"
+                          value={newBudgetCategoryPercentage}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/[^0-9.]/g, "")
+
+                            // Allow any input including just "."
+                            setNewBudgetCategoryPercentage(value)
+                          }}
+                          className="w-16 pr-6"
+                        />
+                        <span className="absolute right-2">$</span>
+                      </div>
+                      <ColorPicker selectedColor={newBudgetCategoryColor} onColorChange={setNewBudgetCategoryColor} />
+                    </div>
+                    <Button onClick={() => handleAddCategory("budget")} className="mt-2 w-full">
+                      Add Budget Category
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
           <Input
             placeholder="Search expenses..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-64"
+            className="w-full md:w-64"
           />
-          <Popover open={isFilterPopoverOpen} onOpenChange={setIsFilterPopoverOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="icon">
-                <Filter className="h-4 w-4" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-80">
-              <div className="grid gap-4">
-                <div className="space-y-2">
-                  <h4 className="font-medium leading-none">Filter Expenses</h4>
-                  <p className="text-sm text-muted-foreground">Narrow down expenses by category and amount range.</p>
+          <div className="flex space-x-2">
+            <Popover open={isFilterPopoverOpen} onOpenChange={setIsFilterPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <Filter className="h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80">
+                <div className="grid gap-4">
+                  <div className="space-y-2">
+                    <h4 className="font-medium leading-none">Filter Expenses</h4>
+                    <p className="text-sm text-muted-foreground">Narrow down expenses by category and amount range.</p>
+                  </div>
+                  <div className="grid gap-2">
+                    <div className="grid grid-cols-3 items-center gap-4">
+                      <Label htmlFor="category">Category</Label>
+                      <Select value={filterCategory} onValueChange={setFilterCategory}>
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="All">All Categories</SelectItem>
+                          {highlightCategory === "expense"
+                            ? spendingCategories.map((category) => (
+                                <SelectItem key={category.name} value={category.name}>
+                                  {category.name}
+                                </SelectItem>
+                              ))
+                            : budgetCategories.map((category) => (
+                                <SelectItem key={category.name} value={category.name}>
+                                  {category.name}
+                                </SelectItem>
+                              ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-3 items-center gap-4">
+                      <Label htmlFor="minAmount">Min Amount</Label>
+                      <Input
+                        id="minAmount"
+                        type="number"
+                        value={filterMinAmount}
+                        onChange={(e) => setFilterMinAmount(e.target.value)}
+                        className="col-span-2 h-8"
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 items-center gap-4">
+                      <Label htmlFor="maxAmount">Max Amount</Label>
+                      <Input
+                        id="maxAmount"
+                        type="number"
+                        value={filterMaxAmount}
+                        onChange={(e) => setFilterMaxAmount(e.target.value)}
+                        className="col-span-2 h-8"
+                      />
+                    </div>
+                  </div>
+                  <Button onClick={applyFilters}>Apply Filters</Button>
                 </div>
-                <div className="grid gap-2">
-                  <div className="grid grid-cols-3 items-center gap-4">
-                    <Label htmlFor="category">Category</Label>
-                    <Select value={filterCategory} onValueChange={setFilterCategory}>
-                      <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="All">All Categories</SelectItem>
-                        {categories.map((category) => (
-                          <SelectItem key={category} value={category}>
-                            {category}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid grid-cols-3 items-center gap-4">
-                    <Label htmlFor="minAmount">Min Amount</Label>
-                    <Input
-                      id="minAmount"
-                      type="number"
-                      value={filterMinAmount}
-                      onChange={(e) => setFilterMinAmount(e.target.value)}
-                      className="col-span-2 h-8"
-                    />
-                  </div>
-                  <div className="grid grid-cols-3 items-center gap-4">
-                    <Label htmlFor="maxAmount">Max Amount</Label>
-                    <Input
-                      id="maxAmount"
-                      type="number"
-                      value={filterMaxAmount}
-                      onChange={(e) => setFilterMaxAmount(e.target.value)}
-                      className="col-span-2 h-8"
-                    />
-                  </div>
-                </div>
-                <Button onClick={applyFilters}>Apply Filters</Button>
-              </div>
-            </PopoverContent>
-          </Popover>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => setClearConfirmOpen(true)}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                <span>Clear List</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={() => {
-                  setImportDialogOpen(true)
-                  // Remove the line that clicks the file input
-                }}
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                <span>Import CSV</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              </PopoverContent>
+            </Popover>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => setClearConfirmOpen(true)}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  <span>Clear List</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    setImportDialogOpen
+                  }}
+                >
+                  <span>Import CSV</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
-      <div className="w-full overflow-hidden rounded-lg border border-border">
-        <Table className="expense-table">
-          <TableHeader>
-            <TableRow className="hover:bg-background">
-              <TableHead className="w-[50px]"></TableHead>
-              <TableHead className="w-[150px]">Date</TableHead>
-              <TableHead className="w-[300px]">Description</TableHead>
-              <TableHead className="w-[120px]">Amount</TableHead>
-              <TableHead className="w-[300px] relative">
-                <div className="flex justify-between items-center">
-                  <span className="pl-8">
-                    {highlightCategory === "expense" ? "Spending Category" : "Budget Category"}
-                  </span>
-                  <Dialog open={isEditCategoryOpen} onOpenChange={setIsEditCategoryOpen}>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-8 w-8 mr-2">
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[700px] h-[80vh] flex flex-col">
-                      <DialogHeader>
-                        <DialogTitle className="text-2xl font-bold">Manage Categories</DialogTitle>
-                      </DialogHeader>
-                      <div className="grid grid-cols-2 gap-8 flex-grow overflow-hidden">
-                        <div className="overflow-y-auto pr-2 h-full flex flex-col">
-                          <h3 className="font-semibold mb-4 text-lg sticky top-0 bg-background z-10 py-2">
-                            Spending Categories
-                          </h3>
-                          <div className="space-y-4 flex-grow overflow-y-auto">
-                            {spendingCategories.map((category, index) => (
-                              <div key={index} className="flex items-center space-x-2 bg-secondary p-2 rounded-md">
-                                {editingCategoryId === `spending-${index}` ? (
-                                  <>
-                                    <Input
-                                      value={category.name}
-                                      onChange={(e) => {
-                                        const updatedCategories = [...spendingCategories]
-                                        updatedCategories[index].name = e.target.value
-                                        setSpendingCategories(updatedCategories)
-                                      }}
-                                      className="flex-grow"
-                                    />
-                                    <ColorPicker
-                                      selectedColor={category.color}
-                                      onColorChange={(color) => {
-                                        const updatedCategories = [...spendingCategories]
-                                        updatedCategories[index].color = color
-                                        setSpendingCategories(updatedCategories)
-                                        CATEGORY_COLORS[category.name] = color
-                                      }}
-                                    />
-                                    <Button variant="ghost" size="sm" onClick={() => setEditingCategoryId(null)}>
-                                      <Check className="h-4 w-4" />
-                                    </Button>
-                                  </>
-                                ) : (
-                                  <>
-                                    <div
-                                      className="w-4 h-4 rounded-md"
-                                      style={{ backgroundColor: category.color }}
-                                    ></div>
-                                    <span className="flex-grow">{category.name}</span>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => setEditingCategoryId(`spending-${index}`)}
-                                    >
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleDeleteCategory("spending", category.name)}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                          <div className="sticky bottom-0 bg-background pt-4 border-t mt-4">
-                            <h3 className="font-semibold mb-4 text-lg">Add New Category</h3>
-                            <div className="mt-4 flex items-center gap-4">
-                              <Input
-                                placeholder="New Category"
-                                value={newSpendingCategoryName}
-                                onChange={(e) => setNewSpendingCategoryName(e.target.value)}
-                                className="flex-grow"
-                              />
-                              <ColorPicker
-                                selectedColor={newSpendingCategoryColor}
-                                onColorChange={setNewSpendingCategoryColor}
-                              />
-                            </div>
-                            <Button onClick={() => handleAddCategory("spending")} className="mt-2 w-full">
-                              Add Spending Category
-                            </Button>
-                          </div>
-                        </div>
-                        <div className="overflow-y-auto pr-2 h-full flex flex-col">
-                          <h3 className="font-semibold mb-4 text-lg sticky top-0 bg-background z-10 py-2">
-                            Budget Categories
-                          </h3>
-                          <div className="space-y-4 flex-grow overflow-y-auto">
-                            {budgetCategories.map((category, index) => (
-                              <div key={index} className="flex items-center space-x-2 bg-secondary p-2 rounded-md">
-                                {editingCategoryId === `budget-${index}` ? (
-                                  <>
-                                    <Input
-                                      value={category.name}
-                                      onChange={(e) => {
-                                        const updatedCategory = { ...category, name: e.target.value }
-                                        handleUpdateBudgetCategory(index, updatedCategory)
-                                      }}
-                                      className="flex-grow"
-                                    />
-                                    <ColorPicker
-                                      selectedColor={category.color}
-                                      onColorChange={(color) => {
-                                        const updatedCategory = { ...category, color: color }
-                                        handleUpdateBudgetCategory(index, updatedCategory)
-                                      }}
-                                    />
-                                    <Input
-                                      type="number"
-                                      value={category.percentage}
-                                      onChange={(e) => {
-                                        const updatedCategory = {
-                                          ...category,
-                                          percentage: Number.parseFloat(e.target.value) || 0,
-                                        }
-                                        handleUpdateBudgetCategory(index, updatedCategory)
-                                      }}
-                                      className="w-20"
-                                    />
-                                    <span>%</span>
-                                    <Button variant="ghost" size="sm" onClick={() => setEditingCategoryId(null)}>
-                                      <Check className="h-4 w-4" />
-                                    </Button>
-                                  </>
-                                ) : (
-                                  <>
-                                    <div
-                                      className="w-4 h-4 rounded-md"
-                                      style={{ backgroundColor: category.color }}
-                                    ></div>
-                                    <span className="flex-grow">{category.name}</span>
-                                    <span className="mr-2">{category.percentage}%</span>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => setEditingCategoryId(`budget-${index}`)}
-                                    >
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleDeleteCategory("budget", category.name)}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                          <div className="sticky bottom-0 bg-background pt-4 border-t mt-4">
-                            <h3 className="font-semibold mb-4 text-lg">Add New Category</h3>
-                            <div className="mt-4 flex items-center gap-4">
-                              <Input
-                                placeholder="New Category"
-                                value={newBudgetCategoryName}
-                                onChange={(e) => setNewBudgetCategoryName(e.target.value)}
-                                className="flex-grow"
-                              />
-                              <div className="flex items-center w-24 relative">
-                                <Input
-                                  type="text"
-                                  inputMode="numeric"
-                                  pattern="[0-9]*"
-                                  placeholder="0"
-                                  value={newBudgetCategoryPercentage}
-                                  onChange={(e) => {
-                                    const value = e.target.value.replace(/[^0-9]/g, "")
-                                    const numValue = Number.parseInt(value, 10)
-                                    if (!isNaN(numValue) && numValue <= 100) {
-                                      setNewBudgetCategoryPercentage(value)
-                                    } else if (isNaN(numValue)) {
-                                      setNewBudgetCategoryPercentage("")
-                                    }
-                                  }}
-                                  className="w-16 pr-6"
-                                />
-                                <span className="absolute right-2">%</span>
-                              </div>
-                              <ColorPicker
-                                selectedColor={newBudgetCategoryColor}
-                                onColorChange={setNewBudgetCategoryColor}
-                              />
-                            </div>
-                            <Button onClick={() => handleAddCategory("budget")} className="mt-2 w-full">
-                              Add Budget Category
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredExpenses.map((expense, index) => (
+
+      {/* Expenses Table */}
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Description
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Category
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Budget Category
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {console.log("Filtered expenses:", filteredExpenses.length)}
+            {filteredExpenses.map((expense) => (
               <TableRow
-                key={expense.id}
+                key={`expense-${expense.id}-${expense.date}-${expense.amount}-${forceUpdate}`}
                 onClick={() => setEditingExpense(expense)}
                 onMouseEnter={() => setHoveredRow(expense.id)}
                 onMouseLeave={() => setHoveredRow(null)}
                 className="cursor-pointer hover:bg-muted/50"
                 style={getRowStyle(expense, hoveredRow === expense.id)}
               >
-                <TableCell className="w-[50px]">
-                  <div className="flex flex-col">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        moveExpense(index, "up")
-                      }}
-                      disabled={index === 0}
-                      className="h-6 w-6 text-black hover:text-black/90"
-                    >
-                      <ChevronUp className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        moveExpense(index, "down")
-                      }}
-                      disabled={index === filteredExpenses.length - 1}
-                      className="h-6 w-6 text-black hover:text-black/90"
-                    >
-                      <ChevronDown className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </TableCell>
-                <TableCell className="relative">
-                  <span>{expense.date}</span>
-                </TableCell>
-                <TableCell className="relative pl-4">
-                  <span>{expense.description}</span>
-                  {expense.notes && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <FileText className="inline-block ml-2 h-4 w-4" />
-                        </TooltipTrigger>
-                        <TooltipContent side="right" sideOffset={5}>
-                          <p className="max-w-xs break-words">{expense.notes}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
-                </TableCell>
-                <TableCell className="relative text-red-600">
-                  <span>${formatNumber(expense.amount)}</span>
-                </TableCell>
-                <TableCell className="relative">
-                  <div className="px-8">
-                    <Badge
-                      variant="outline"
-                      style={getBadgeStyle(
-                        highlightCategory === "expense"
-                          ? CATEGORY_COLORS[expense.category]
-                          : BUDGET_COLORS[expense.budgetCategory],
-                      )}
-                    >
-                      {highlightCategory === "expense" ? expense.category : expense.budgetCategory}
-                    </Badge>
-                  </div>
-                </TableCell>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{expense.date}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{expense.description}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  <Badge variant="outline" style={getBadgeStyle(categoryColors[expense.category] || "#CCCCCC")}>
+                    {expense.category}
+                  </Badge>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  <Badge variant="outline" style={getBadgeStyle(budgetColors[expense.budgetCategory] || "#CCCCCC")}>
+                    {expense.budgetCategory}
+                  </Badge>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatNumber(expense.amount)}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setEditingExpense(expense)}>Edit</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleDeleteExpense()}>Delete</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </td>
               </TableRow>
             ))}
-          </TableBody>
-        </Table>
+          </tbody>
+        </table>
       </div>
 
-      <Dialog open={!!editingExpense} onOpenChange={() => setEditingExpense(null)}>
-        <DialogContent>
+      <Dialog open={editingExpense !== null} onOpenChange={() => setEditingExpense(null)}>
+        <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Edit Expense</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleEditSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="date">Date</Label>
-              <Input id="date" name="date" type="date" defaultValue={editingExpense?.date} required />
+          <form onSubmit={handleEditSubmit}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="date" className="text-right">
+                  Date
+                </Label>
+                <Input id="date" name="date" defaultValue={editingExpense?.date} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="description" className="text-right">
+                  Description
+                </Label>
+                <Input
+                  id="description"
+                  name="description"
+                  defaultValue={editingExpense?.description}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="amount" className="text-right">
+                  Amount
+                </Label>
+                <Input
+                  id="amount"
+                  type="number"
+                  step="0.01"
+                  name="amount"
+                  defaultValue={editingExpense?.amount}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="category" className="text-right">
+                  Category
+                </Label>
+                <Select onValueChange={(value) => handleCategoryChange(value)} defaultValue={editingExpense?.category}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {spendingCategories.map((category) => (
+                      <SelectItem key={category.name} value={category.name}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="budgetCategory" className="text-right">
+                  Budget Category
+                </Label>
+                <Select defaultValue={editingExpense?.budgetCategory} onValueChange={() => {}}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Select budget category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {budgetCategories.map((category) => (
+                      <SelectItem key={category.name} value={category.name}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="notes" className="text-right">
+                  Notes
+                </Label>
+                <Input id="notes" name="notes" defaultValue={editingExpense?.notes} className="col-span-3" />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Input id="description" name="description" defaultValue={editingExpense?.description} required />
+            <div className="flex justify-end">
+              <Button type="submit">Save changes</Button>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="amount">Amount</Label>
-              <Input
-                id="amount"
-                name="amount"
-                type="number"
-                step="0.01"
-                defaultValue={editingExpense?.amount}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="category">Spending Category</Label>
-              <Select name="category" defaultValue={editingExpense?.category}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select spending category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {spendingCategories.map((category) => (
-                    <SelectItem key={category.name} value={category.name}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="budgetCategory">Budget Category</Label>
-              <Select name="budgetCategory" defaultValue={editingExpense?.budgetCategory}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select budget category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {budgetCategories.map((category) => (
-                    <SelectItem key={category.name} value={category.name}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="notes">Comments (Optional)</Label>
-              <Textarea
-                id="notes"
-                name="notes"
-                defaultValue={editingExpense?.notes}
-                placeholder="Add any additional comments here"
-              />
-            </div>
-            <Button type="submit">Save Changes</Button>
           </form>
         </DialogContent>
       </Dialog>
 
       <Dialog open={clearConfirmOpen} onOpenChange={setClearConfirmOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Clear Expense List</DialogTitle>
+            <DialogTitle>Clear Expenses</DialogTitle>
             <DialogDescription>
               Are you sure you want to clear all expenses? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setClearConfirmOpen(false)}>
+          <div className="flex justify-end space-x-2">
+            <Button variant="secondary" onClick={() => setClearConfirmOpen(false)}>
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleClearExpenses}>
               Clear
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
-      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+
+      <Dialog open={importDialogOpen} onOpenChange={() => setImportDialogOpen(false)}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Import CSV</DialogTitle>
+            <DialogDescription>Select a CSV file to import expenses.</DialogDescription>
           </DialogHeader>
-          <div className="flex items-center justify-center p-6 text-center">
-            <p className="text-lg font-medium">This doesn't work yet lol</p>
+          <Input type="file" accept=".csv" onChange={handleFileUpload} />
+          <div className="flex justify-end">
+            <Button variant="secondary" onClick={() => setImportDialogOpen(false)}>
+              Cancel
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
     </>
   )
 }
-
