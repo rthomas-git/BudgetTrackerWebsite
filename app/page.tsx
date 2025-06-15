@@ -196,15 +196,20 @@ function DashboardContent() {
 
     // Check if any expenses have budget categories that don't exist anymore
     const updatedExpenses = expenses.map((expense) => {
+      // Add null checks
+      if (!expense || !expense.budgetCategory) {
+        return expense
+      }
+
       // Check if this expense's budget category still exists
-      const categoryExists = budgetCategories.some((cat) => cat.name === expense.budgetCategory)
+      const categoryExists = budgetCategories.some((cat) => cat && cat.name === expense.budgetCategory)
 
       if (!categoryExists) {
         console.log(`Budget category ${expense.budgetCategory} no longer exists for expense ${expense.description}`)
 
         // Try to find a matching category by looking at the first letter
         const firstLetter = expense.budgetCategory.charAt(0)
-        const possibleMatch = budgetCategories.find((cat) => cat.name.charAt(0) === firstLetter)
+        const possibleMatch = budgetCategories.find((cat) => cat && cat.name && cat.name.charAt(0) === firstLetter)
 
         if (possibleMatch) {
           console.log(`Updating expense ${expense.description} from ${expense.budgetCategory} to ${possibleMatch.name}`)
@@ -212,7 +217,7 @@ function DashboardContent() {
         }
 
         // If no match found, use the first category
-        if (budgetCategories.length > 0) {
+        if (budgetCategories.length > 0 && budgetCategories[0] && budgetCategories[0].name) {
           console.log(
             `Updating expense ${expense.description} from ${expense.budgetCategory} to ${budgetCategories[0].name}`,
           )

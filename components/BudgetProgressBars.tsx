@@ -97,70 +97,72 @@ export default function BudgetProgressBars({
 
   return (
     <>
-      {budgetCategories.map((item, index) => {
-        const budgeted = (() => {
-          let amount = 0
+      {budgetCategories
+        .filter((item) => item && item.name)
+        .map((item, index) => {
+          const budgeted = (() => {
+            let amount = 0
 
-          if (typeof item.amount === "string") {
-            // Handle "." as 0 for calculations
-            if (item.amount === ".") {
-              amount = 0
-            } else {
-              // Try to parse the string as a float
-              const parsed = Number.parseFloat(item.amount)
-              amount = isNaN(parsed) ? 0 : parsed
+            if (typeof item.amount === "string") {
+              // Handle "." as 0 for calculations
+              if (item.amount === ".") {
+                amount = 0
+              } else {
+                // Try to parse the string as a float
+                const parsed = Number.parseFloat(item.amount)
+                amount = isNaN(parsed) ? 0 : parsed
+              }
+            } else if (typeof item.amount === "number") {
+              amount = item.amount
             }
-          } else if (typeof item.amount === "number") {
-            amount = item.amount
-          }
 
-          return amount
-        })()
-        const spent = categoryExpenses[item.name] || 0
-        const remaining = budgeted - spent
-        const progress = budgeted > 0 ? (spent / budgeted) * 100 : 0
+            return amount
+          })()
+          const spent = categoryExpenses[item.name] || 0
+          const remaining = budgeted - spent
+          const progress = budgeted > 0 ? (spent / budgeted) * 100 : 0
 
-        return (
-          <div
-            key={item.name}
-            className="border rounded-lg shadow-sm p-2 md:p-3 h-[110px] md:h-[130px] flex flex-col justify-between relative cursor-pointer hover:border-primary/50 transition-colors"
-            onClick={() => handleEditCategory(index, item)}
-          >
-            <div className="flex items-center justify-between mb-1">
-              <div className="flex items-center space-x-1 md:space-x-2">
-                <div
-                  className="w-2 h-2 md:w-3 md:h-3 rounded-sm flex-shrink-0"
-                  style={{ backgroundColor: item.color || BUDGET_COLORS[item.name] || "#000000" }}
+          return (
+            <div
+              key={item.name}
+              className="border rounded-lg shadow-sm p-2 md:p-3 h-[110px] md:h-[130px] flex flex-col justify-between relative cursor-pointer hover:border-primary/50 transition-colors"
+              onClick={() => handleEditCategory(index, item)}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center space-x-1 md:space-x-2">
+                  <div
+                    className="w-2 h-2 md:w-3 md:h-3 rounded-sm flex-shrink-0"
+                    style={{ backgroundColor: item.color || BUDGET_COLORS[item.name] || "#000000" }}
+                  />
+                  <h3 className="font-semibold text-sm md:text-base truncate">{item.name}</h3>
+                </div>
+                <span className="text-xs md:text-sm font-medium">{item.percentage.toFixed(1)}%</span>
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs md:text-sm">
+                  <span className="truncate">Spent: ${formatNumber(spent)}</span>
+                  <span>Budget: ${formatNumber(budgeted)}</span>
+                </div>
+                <Progress
+                  value={progress > 100 ? 100 : progress}
+                  className={`h-1 md:h-1.5 ${progress > 100 ? "bg-destructive/20" : ""}`}
+                  style={
+                    {
+                      "--progress-background":
+                        progress > 100 ? "var(--destructive)" : item.color || BUDGET_COLORS[item.name] || "#000000",
+                    } as React.CSSProperties
+                  }
                 />
-                <h3 className="font-semibold text-sm md:text-base truncate">{item.name}</h3>
-              </div>
-              <span className="text-xs md:text-sm font-medium">{item.percentage.toFixed(1)}%</span>
-            </div>
-            <div className="space-y-1">
-              <div className="flex justify-between text-xs md:text-sm">
-                <span className="truncate">Spent: ${formatNumber(spent)}</span>
-                <span>Budget: ${formatNumber(budgeted)}</span>
-              </div>
-              <Progress
-                value={progress > 100 ? 100 : progress}
-                className={`h-1 md:h-1.5 ${progress > 100 ? "bg-destructive/20" : ""}`}
-                style={
-                  {
-                    "--progress-background":
-                      progress > 100 ? "var(--destructive)" : item.color || BUDGET_COLORS[item.name] || "#000000",
-                  } as React.CSSProperties
-                }
-              />
-              <div className="flex justify-between text-xs md:text-sm">
-                <span className={remaining >= 0 ? "text-green-600" : "text-red-600"}>
-                  ${formatNumber(Math.abs(remaining))} {remaining >= 0 ? "left" : "over"}
-                </span>
-                <span className="text-muted-foreground">{progress.toFixed(0)}%</span>
+                <div className="flex justify-between text-xs md:text-sm">
+                  <span className={remaining >= 0 ? "text-green-600" : "text-red-600"}>
+                    ${formatNumber(Math.abs(remaining))} {remaining >= 0 ? "left" : "over"}
+                  </span>
+                  <span className="text-muted-foreground">{progress.toFixed(0)}%</span>
+                </div>
               </div>
             </div>
-          </div>
-        )
-      })}
+          )
+        })}
 
       {/* Edit Dialog */}
       <Dialog open={!!editingCategory} onOpenChange={(open) => !open && setEditingCategory(null)}>

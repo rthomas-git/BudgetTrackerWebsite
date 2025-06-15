@@ -211,13 +211,20 @@ export default function ExpenseList({
 
     // Loop through old categories and check if names have changed
     oldCategories.forEach((oldCat) => {
+      if (!oldCat || !oldCat.name) return // Add null check
+
       const newCat = newCategories.find(
         (cat) =>
+          // Add null checks
+          cat &&
+          cat.name &&
+          oldCat.color &&
           // If we find a category with the same index but different name
-          cat.color === oldCat.color && cat.name !== oldCat.name,
+          cat.color === oldCat.color &&
+          cat.name !== oldCat.name,
       )
 
-      if (newCat) {
+      if (newCat && newCat.name) {
         console.log(`Category name changed: ${oldCat.name} -> ${newCat.name}`)
         nameChanges[oldCat.name] = newCat.name
       }
@@ -228,6 +235,8 @@ export default function ExpenseList({
       console.log("Updating expenses with new category names:", nameChanges)
 
       const updatedExpenses = expenses.map((expense) => {
+        if (!expense || !expense.category) return expense // Add null check
+
         if (nameChanges[expense.category]) {
           console.log(`Updating expense category: ${expense.category} -> ${nameChanges[expense.category]}`)
           return { ...expense, category: nameChanges[expense.category] }
@@ -240,9 +249,12 @@ export default function ExpenseList({
 
       // Update colors in context for old->new name mappings
       Object.entries(nameChanges).forEach(([oldName, newName]) => {
-        const oldColor = categoryColors[oldName]
-        if (oldColor) {
-          updateCategoryColor(newName, oldColor)
+        if (oldName && newName) {
+          // Add null check
+          const oldColor = categoryColors[oldName]
+          if (oldColor) {
+            updateCategoryColor(newName, oldColor)
+          }
         }
       })
     }
@@ -254,7 +266,8 @@ export default function ExpenseList({
 
     // Update colors in context for all categories
     newCategories.forEach((category) => {
-      if (category.name && category.color) {
+      if (category && category.name && category.color) {
+        // Add null check
         updateCategoryColor(category.name, category.color)
       }
     })
@@ -373,10 +386,13 @@ export default function ExpenseList({
   }
 
   const filteredExpenses = expenses.filter((expense) => {
+    // Add null check
+    if (!expense) return false
+
     const matchesSearch =
-      expense.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      expense.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      expense.budgetCategory.toLowerCase().includes(searchTerm.toLowerCase())
+      (expense.description && expense.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (expense.category && expense.category.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (expense.budgetCategory && expense.budgetCategory.toLowerCase().includes(searchTerm.toLowerCase()))
 
     // Update this line to check the appropriate category field based on highlightCategory
     const matchesCategory =
@@ -716,76 +732,82 @@ export default function ExpenseList({
                     Spending Categories
                   </h3>
                   <div className="space-y-4 flex-grow overflow-y-auto">
-                    {spendingCategories.map((category, index) => (
-                      <div key={index} className="flex items-center space-x-2 bg-secondary p-2 rounded-md">
-                        {editingCategoryId === `spending-${index}` ? (
-                          <>
-                            <Input
-                              value={category.name}
-                              onChange={(e) => {
-                                const updatedCategories = [...spendingCategories]
-                                const oldName = updatedCategories[index].name
-                                updatedCategories[index].name = e.target.value
+                    {spendingCategories
+                      .filter((cat) => cat && cat.name)
+                      .map((category, index) => (
+                        <div key={index} className="flex items-center space-x-2 bg-secondary p-2 rounded-md">
+                          {editingCategoryId === `spending-${index}` ? (
+                            <>
+                              <Input
+                                value={category.name}
+                                onChange={(e) => {
+                                  const updatedCategories = [...spendingCategories]
+                                  const oldName = updatedCategories[index].name
+                                  updatedCategories[index].name = e.target.value
 
-                                // Update expenses with the new category name
-                                if (oldName !== e.target.value) {
-                                  const updatedExpenses = expenses.map((expense) => {
-                                    if (expense.category === oldName) {
-                                      return { ...expense, category: e.target.value }
+                                  // Update expenses with the new category name
+                                  if (oldName !== e.target.value) {
+                                    const updatedExpenses = expenses.map((expense) => {
+                                      if (expense.category === oldName) {
+                                        return { ...expense, category: e.target.value }
+                                      }
+                                      return expense
+                                    })
+
+                                    // Update colors in context
+                                    if (categoryColors[oldName]) {
+                                      updateCategoryColor(e.target.value, categoryColors[oldName])
                                     }
-                                    return expense
-                                  })
 
-                                  // Update colors in context
-                                  if (categoryColors[oldName]) {
-                                    updateCategoryColor(e.target.value, categoryColors[oldName])
+                                    // Update expenses
+                                    onReorderExpenses(updatedExpenses)
                                   }
 
-                                  // Update expenses
-                                  onReorderExpenses(updatedExpenses)
-                                }
-
-                                // Update categories
-                                updateSpendingCategories(updatedCategories)
-                              }}
-                              className="flex-grow"
-                            />
-                            <ColorPicker
-                              selectedColor={category.color || "#CCCCCC"}
-                              onColorChange={(color) => {
-                                const updatedCategories = [...spendingCategories]
-                                updatedCategories[index].color = color
-                                updateSpendingCategories(updatedCategories)
-                                if (category.name) {
-                                  updateCategoryColor(category.name, color)
-                                }
-                              }}
-                            />
-                            <Button variant="ghost" size="sm" onClick={() => setEditingCategoryId(null)}>
-                              <Check className="h-4 w-4" />
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <div
-                              className="w-5 h-5 rounded-md border flex-shrink-0"
-                              style={{ backgroundColor: category.color }}
-                            ></div>
-                            <span className="flex-grow">{category.name}</span>
-                            <Button variant="ghost" size="sm" onClick={() => setEditingCategoryId(`spending-${index}`)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteCategory("spending", category.name)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    ))}
+                                  // Update categories
+                                  updateSpendingCategories(updatedCategories)
+                                }}
+                                className="flex-grow"
+                              />
+                              <ColorPicker
+                                selectedColor={category.color || "#CCCCCC"}
+                                onColorChange={(color) => {
+                                  const updatedCategories = [...spendingCategories]
+                                  updatedCategories[index].color = color
+                                  updateSpendingCategories(updatedCategories)
+                                  if (category.name) {
+                                    updateCategoryColor(category.name, color)
+                                  }
+                                }}
+                              />
+                              <Button variant="ghost" size="sm" onClick={() => setEditingCategoryId(null)}>
+                                <Check className="h-4 w-4" />
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <div
+                                className="w-5 h-5 rounded-md border flex-shrink-0"
+                                style={{ backgroundColor: category.color }}
+                              ></div>
+                              <span className="flex-grow">{category.name}</span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setEditingCategoryId(`spending-${index}`)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteCategory("spending", category.name)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      ))}
                   </div>
                   <div className="sticky bottom-0 bg-background pt-4 border-t mt-4">
                     <h3 className="font-semibold mb-4 text-lg">Add New Category</h3>
@@ -809,102 +831,104 @@ export default function ExpenseList({
                 <div className="overflow-y-auto pr-2 h-full flex flex-col">
                   <h3 className="font-semibold mb-4 text-lg sticky top-0 bg-background z-10 py-2">Budget Categories</h3>
                   <div className="space-y-4 flex-grow overflow-y-auto">
-                    {budgetCategories.map((category, index) => (
-                      <div key={index} className="flex items-center space-x-2 bg-secondary p-2 rounded-md">
-                        {editingCategoryId === `budget-${index}` ? (
-                          <>
-                            <div className="flex flex-col space-y-2 w-full">
-                              <div className="flex items-center space-x-2">
-                                <Input
-                                  value={category.name}
-                                  onChange={(e) => {
-                                    const updatedCategories = [...budgetCategories]
-                                    const oldName = updatedCategories[index].name
-                                    updatedCategories[index].name = e.target.value
+                    {budgetCategories
+                      .filter((cat) => cat && cat.name)
+                      .map((category, index) => (
+                        <div key={index} className="flex items-center space-x-2 bg-secondary p-2 rounded-md">
+                          {editingCategoryId === `budget-${index}` ? (
+                            <>
+                              <div className="flex flex-col space-y-2 w-full">
+                                <div className="flex items-center space-x-2">
+                                  <Input
+                                    value={category.name}
+                                    onChange={(e) => {
+                                      const updatedCategories = [...budgetCategories]
+                                      const oldName = updatedCategories[index].name
+                                      updatedCategories[index].name = e.target.value
 
-                                    // Create a new updated category object
-                                    const updatedCategory = {
-                                      ...category,
-                                      name: e.target.value,
+                                      // Create a new updated category object
+                                      const updatedCategory = {
+                                        ...category,
+                                        name: e.target.value,
+                                      }
+
+                                      // Update the budget category with the new name
+                                      handleUpdateBudgetCategory(index, updatedCategory)
+                                    }}
+                                    className="flex-grow"
+                                    placeholder="Category Name"
+                                  />
+                                  <ColorPicker
+                                    selectedColor={category.color}
+                                    onColorChange={(color) => {
+                                      const updatedCategory = { ...category, color: color }
+                                      handleUpdateBudgetCategory(index, updatedCategory)
+                                    }}
+                                  />
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <Input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={
+                                      typeof category.amount === "undefined"
+                                        ? category.percentage.toString()
+                                        : category.amount.toString()
                                     }
+                                    onChange={(e) => {
+                                      const value = e.target.value.replace(/[^0-9.]/g, "")
 
-                                    // Update the budget category with the new name
-                                    handleUpdateBudgetCategory(index, updatedCategory)
-                                  }}
-                                  className="flex-grow"
-                                  placeholder="Category Name"
-                                />
-                                <ColorPicker
-                                  selectedColor={category.color}
-                                  onColorChange={(color) => {
-                                    const updatedCategory = { ...category, color: color }
-                                    handleUpdateBudgetCategory(index, updatedCategory)
-                                  }}
-                                />
+                                      // Calculate percentage based on amount
+                                      const amount = value === "" || value === "." ? 0 : Number(value)
+                                      const percentage = (amount / income) * 100
+
+                                      // Allow any input including just "."
+                                      const updatedCategory = {
+                                        ...category,
+                                        amount: value,
+                                        percentage: percentage,
+                                      }
+                                      handleUpdateBudgetCategory(index, updatedCategory)
+                                    }}
+                                    className="w-full"
+                                    placeholder="Amount"
+                                  />
+                                  <Button variant="ghost" size="sm" onClick={() => setEditingCategoryId(null)}>
+                                    <Check className="h-4 w-4" />
+                                  </Button>
+                                </div>
                               </div>
-                              <div className="flex items-center space-x-2">
-                                <Input
-                                  type="text"
-                                  inputMode="decimal"
-                                  value={
-                                    typeof category.amount === "undefined"
-                                      ? category.percentage.toString()
-                                      : category.amount.toString()
-                                  }
-                                  onChange={(e) => {
-                                    const value = e.target.value.replace(/[^0-9.]/g, "")
-
-                                    // Calculate percentage based on amount
-                                    const amount = value === "" || value === "." ? 0 : Number(value)
-                                    const percentage = (amount / income) * 100
-
-                                    // Allow any input including just "."
-                                    const updatedCategory = {
-                                      ...category,
-                                      amount: value,
-                                      percentage: percentage,
-                                    }
-                                    handleUpdateBudgetCategory(index, updatedCategory)
-                                  }}
-                                  className="w-full"
-                                  placeholder="Amount"
-                                />
-                                <Button variant="ghost" size="sm" onClick={() => setEditingCategoryId(null)}>
-                                  <Check className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <div
-                              className="w-5 h-5 rounded-md border flex-shrink-0"
-                              style={{ backgroundColor: category.color }}
-                            ></div>
-                            <span className="flex-grow">{category.name}</span>
-                            <span className="mr-2">
-                              $
-                              {typeof category.amount !== "undefined"
-                                ? typeof category.amount === "string"
-                                  ? category.amount
-                                  : formatNumber(category.amount)
-                                : formatNumber((category.percentage / 100) * income)}{" "}
-                              ({category.percentage.toFixed(1)}%)
-                            </span>
-                            <Button variant="ghost" size="sm" onClick={() => setEditingCategoryId(`budget-${index}`)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteCategory("budget", category.name)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    ))}
+                            </>
+                          ) : (
+                            <>
+                              <div
+                                className="w-5 h-5 rounded-md border flex-shrink-0"
+                                style={{ backgroundColor: category.color }}
+                              ></div>
+                              <span className="flex-grow">{category.name}</span>
+                              <span className="mr-2">
+                                $
+                                {typeof category.amount !== "undefined"
+                                  ? typeof category.amount === "string"
+                                    ? category.amount
+                                    : formatNumber(category.amount)
+                                  : formatNumber((category.percentage / 100) * income)}{" "}
+                                ({category.percentage.toFixed(1)}%)
+                              </span>
+                              <Button variant="ghost" size="sm" onClick={() => setEditingCategoryId(`budget-${index}`)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteCategory("budget", category.name)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      ))}
                   </div>
                   <div className="sticky bottom-0 bg-background pt-4 border-t mt-4">
                     <h3 className="font-semibold mb-4 text-lg">Add New Category</h3>
@@ -970,16 +994,20 @@ export default function ExpenseList({
                         <SelectContent>
                           <SelectItem value="All">All Categories</SelectItem>
                           {highlightCategory === "expense"
-                            ? spendingCategories.map((category) => (
-                                <SelectItem key={category.name} value={category.name}>
-                                  {category.name}
-                                </SelectItem>
-                              ))
-                            : budgetCategories.map((category) => (
-                                <SelectItem key={category.name} value={category.name}>
-                                  {category.name}
-                                </SelectItem>
-                              ))}
+                            ? spendingCategories
+                                .filter((cat) => cat && cat.name)
+                                .map((category) => (
+                                  <SelectItem key={category.name} value={category.name}>
+                                    {category.name}
+                                  </SelectItem>
+                                ))
+                            : budgetCategories
+                                .filter((cat) => cat && cat.name)
+                                .map((category) => (
+                                  <SelectItem key={category.name} value={category.name}>
+                                    {category.name}
+                                  </SelectItem>
+                                ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -1188,11 +1216,13 @@ export default function ExpenseList({
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    {spendingCategories.map((category) => (
-                      <SelectItem key={category.name} value={category.name}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
+                    {spendingCategories
+                      .filter((cat) => cat && cat.name)
+                      .map((category) => (
+                        <SelectItem key={category.name} value={category.name}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -1205,11 +1235,13 @@ export default function ExpenseList({
                     <SelectValue placeholder="Select budget category" />
                   </SelectTrigger>
                   <SelectContent>
-                    {budgetCategories.map((category) => (
-                      <SelectItem key={category.name} value={category.name}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
+                    {budgetCategories
+                      .filter((cat) => cat && cat.name)
+                      .map((category) => (
+                        <SelectItem key={category.name} value={category.name}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
