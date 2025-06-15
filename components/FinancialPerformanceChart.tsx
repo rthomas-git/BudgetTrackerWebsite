@@ -18,7 +18,7 @@ const generateMockData = () => {
       month: format(date, "MMM yyyy"),
       income: income,
       expenses: expenses,
-      budget: income, // Updated: Added budget field
+      budget: income,
     }
   })
 }

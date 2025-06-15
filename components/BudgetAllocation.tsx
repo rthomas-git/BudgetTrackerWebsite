@@ -5,7 +5,6 @@ import { useBudgetContext } from "@/contexts/BudgetContext"
 import type { Expense } from "./ExpenseList"
 import BudgetProgressBars from "./BudgetProgressBars"
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import BudgetPieChartModal from "./BudgetPieChartModal"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -227,12 +226,6 @@ export default function BudgetAllocation({ expenses }: { expenses: Expense[] }) 
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold">Budget Allocation</h2>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button variant="outline">View Chart</Button>
-          </DialogTrigger>
-          <BudgetPieChartModal budgetCategories={budgetCategories} income={income} />
-        </Dialog>
       </div>
 
       {totalAllocated !== 100 && (

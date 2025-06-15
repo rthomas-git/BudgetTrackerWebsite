@@ -1,6 +1,7 @@
 "use client"
 
 import { DialogDescription } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
 
 import type React from "react"
 
@@ -9,7 +10,6 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useBudgetContext } from "@/contexts/BudgetContext"
@@ -161,6 +161,8 @@ export default function ExpenseList({
   // Add this at the beginning of the ExpenseList component, right after the props destructuring
   console.log("ExpenseList received expenses:", expenses)
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null)
   const {
     budgetCategories = [],
     setBudgetCategories,
@@ -201,7 +203,7 @@ export default function ExpenseList({
   })
 
   // Update the setSpendingCategories function to also update colors in context
-  const updateSpendingCategories = (newCategories, oldCategories = spendingCategories) => {
+  const updateSpendingCategories = (newCategories: any[], oldCategories = spendingCategories) => {
     console.log("Updating spending categories:", { newCategories, oldCategories })
 
     // Check for category name changes
@@ -307,9 +309,10 @@ export default function ExpenseList({
     setEditingExpense(null)
   }
 
-  const handleDeleteExpense = () => {
-    if (editingExpense) {
-      const updatedExpenses = expenses.filter((expense) => expense.id !== editingExpense.id)
+  const handleDeleteExpense = (expenseToDelete?: Expense) => {
+    const targetExpense = expenseToDelete || editingExpense
+    if (targetExpense) {
+      const updatedExpenses = expenses.filter((expense) => expense.id !== targetExpense.id)
       onReorderExpenses(updatedExpenses)
       setEditingExpense(null)
     }
@@ -603,28 +606,39 @@ export default function ExpenseList({
       <PopoverTrigger asChild>
         <Button variant="outline" className="w-[100px] p-0">
           <div className="w-full h-full flex items-center justify-between px-2">
-            <div className="w-6 h-6 rounded-md" style={{ backgroundColor: selectedColor || "#CCCCCC" }} />
+            <div className="w-6 h-6 rounded-md border" style={{ backgroundColor: selectedColor || "#CCCCCC" }} />
             <ChevronDown className="h-4 w-4" />
           </div>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[280px]">
-        <div className="grid grid-cols-6 gap-2">
-          {colorPalette.map((color) => (
-            <Button
-              key={color}
-              variant="outline"
-              className="w-10 h-10 p-0 rounded-md transition-all duration-200 hover:scale-110 relative"
-              style={{ backgroundColor: color }}
-              onClick={() => onColorChange(color)}
-            >
-              {color && selectedColor && color.toLowerCase() === selectedColor.toLowerCase() && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Check className="h-6 w-6 text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]" />
-                </div>
-              )}
-            </Button>
-          ))}
+      <PopoverContent className="w-[320px]">
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="custom-color" className="text-sm font-medium">
+              Pick a Color
+            </Label>
+            <div className="flex items-center space-x-2 mt-2">
+              <Input
+                id="custom-color"
+                type="color"
+                value={selectedColor}
+                onChange={(e) => onColorChange(e.target.value)}
+                className="w-16 h-8 p-1 border rounded cursor-pointer"
+              />
+              <Input
+                type="text"
+                value={selectedColor}
+                onChange={(e) => {
+                  const value = e.target.value
+                  if (/^#[0-9A-Fa-f]{0,6}$/.test(value) || value === "") {
+                    onColorChange(value)
+                  }
+                }}
+                placeholder="#000000"
+                className="flex-1 text-sm"
+              />
+            </div>
+          </div>
         </div>
       </PopoverContent>
     </Popover>
@@ -753,7 +767,10 @@ export default function ExpenseList({
                           </>
                         ) : (
                           <>
-                            <div className="w-4 h-4 rounded-md" style={{ backgroundColor: category.color }}></div>
+                            <div
+                              className="w-5 h-5 rounded-md border flex-shrink-0"
+                              style={{ backgroundColor: category.color }}
+                            ></div>
                             <span className="flex-grow">{category.name}</span>
                             <Button variant="ghost" size="sm" onClick={() => setEditingCategoryId(`spending-${index}`)}>
                               <Edit className="h-4 w-4" />
@@ -860,7 +877,10 @@ export default function ExpenseList({
                           </>
                         ) : (
                           <>
-                            <div className="w-4 h-4 rounded-md" style={{ backgroundColor: category.color }}></div>
+                            <div
+                              className="w-5 h-5 rounded-md border flex-shrink-0"
+                              style={{ backgroundColor: category.color }}
+                            ></div>
                             <span className="flex-grow">{category.name}</span>
                             <span className="mr-2">
                               $
@@ -990,7 +1010,7 @@ export default function ExpenseList({
             </Popover>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon">
+                <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -1017,6 +1037,9 @@ export default function ExpenseList({
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
+                Order
+              </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Description
@@ -1033,7 +1056,7 @@ export default function ExpenseList({
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {console.log("Filtered expenses:", filteredExpenses.length)}
-            {filteredExpenses.map((expense) => (
+            {filteredExpenses.map((expense, index) => (
               <TableRow
                 key={`expense-${expense.id}-${expense.date}-${expense.amount}-${forceUpdate}`}
                 onClick={() => setEditingExpense(expense)}
@@ -1042,6 +1065,34 @@ export default function ExpenseList({
                 className="cursor-pointer hover:bg-muted/50"
                 style={getRowStyle(expense, hoveredRow === expense.id)}
               >
+                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  <div className="flex flex-col items-center space-y-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        moveExpense(index, "up")
+                      }}
+                      disabled={index === 0}
+                      className="h-6 w-6"
+                    >
+                      <ChevronUp className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        moveExpense(index, "down")
+                      }}
+                      disabled={index === filteredExpenses.length - 1}
+                      className="h-6 w-6"
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{expense.date}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{expense.description}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -1054,17 +1105,34 @@ export default function ExpenseList({
                     {expense.budgetCategory}
                   </Badge>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatNumber(expense.amount)}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">
+                  ${formatNumber(expense.amount)}
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
+                      <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setEditingExpense(expense)}>Edit</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleDeleteExpense()}>Delete</DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setEditingExpense(expense)
+                        }}
+                      >
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setExpenseToDelete(expense)
+                          setDeleteConfirmOpen(true)
+                        }}
+                      >
+                        Delete
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </td>
@@ -1152,8 +1220,11 @@ export default function ExpenseList({
                 <Input id="notes" name="notes" defaultValue={editingExpense?.notes} className="col-span-3" />
               </div>
             </div>
-            <div className="flex justify-end">
+            <div className="flex justify-end space-x-2">
               <Button type="submit">Save changes</Button>
+              <Button variant="destructive" onClick={() => handleDeleteExpense()}>
+                Delete
+              </Button>
             </div>
           </form>
         </DialogContent>
@@ -1188,6 +1259,39 @@ export default function ExpenseList({
           <div className="flex justify-end">
             <Button variant="secondary" onClick={() => setImportDialogOpen(false)}>
               Cancel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete Expense</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this expense? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end space-x-2">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setDeleteConfirmOpen(false)
+                setExpenseToDelete(null)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (expenseToDelete) {
+                  handleDeleteExpense(expenseToDelete)
+                }
+                setDeleteConfirmOpen(false)
+                setExpenseToDelete(null)
+              }}
+            >
+              Delete
             </Button>
           </div>
         </DialogContent>

@@ -1,6 +1,6 @@
 "use client"
 import { useState } from "react"
-import { SettingsIcon, HelpCircle, FileDown } from "lucide-react"
+import { SettingsIcon, HelpCircle, FileDown, Sun, Moon, Monitor, Palette } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -8,11 +8,23 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { jsPDF } from "jspdf"
-import autoTable from "jspdf-autotable"
+import "jspdf-autotable"
 import { useBudgetContext } from "@/contexts/BudgetContext"
+import { useTheme } from "next-themes"
+import autoTable from "jspdf-autotable"
+
+// Add this interface at the top
+declare module "jspdf" {
+  interface jsPDF {
+    lastAutoTable: {
+      finalY: number
+    }
+  }
+}
 
 // Define the same storage key used in the main app
 const STORAGE_KEYS = {
@@ -50,6 +62,16 @@ export function Settings() {
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const { budgetCategories, income } = useBudgetContext()
+  const { setTheme, theme } = useTheme()
+
+  const themes = [
+    { name: "Light", value: "light", icon: Sun },
+    { name: "Dark", value: "dark", icon: Moon },
+    { name: "System", value: "system", icon: Monitor },
+    { name: "Ocean", value: "ocean", icon: Palette },
+    { name: "Forest", value: "forest", icon: Palette },
+    { name: "Sunset", value: "sunset", icon: Palette },
+  ]
 
   const generatePDF = () => {
     setIsGenerating(true)
@@ -297,7 +319,7 @@ export function Settings() {
             <span className="sr-only">Settings</span>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent align="end" className="w-48">
           <DropdownMenuItem onSelect={() => setProfileOpen(true)}>Profile Settings</DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setNotificationsOpen(true)}>Notification Preferences</DropdownMenuItem>
           <DropdownMenuSeparator />
@@ -310,6 +332,21 @@ export function Settings() {
             <HelpCircle className="mr-2 h-4 w-4" />
             <span>Help</span>
           </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel>Theme</DropdownMenuLabel>
+          {themes.map((themeOption) => {
+            const Icon = themeOption.icon
+            return (
+              <DropdownMenuItem
+                key={themeOption.value}
+                onClick={() => setTheme(themeOption.value)}
+                className={theme === themeOption.value ? "bg-accent" : ""}
+              >
+                <Icon className="mr-2 h-4 w-4" />
+                {themeOption.name}
+              </DropdownMenuItem>
+            )
+          })}
         </DropdownMenuContent>
       </DropdownMenu>
 

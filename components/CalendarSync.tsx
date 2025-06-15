@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Calendar, momentLocalizer } from "react-big-calendar"
+import { Calendar, momentLocalizer, type Event } from "react-big-calendar"
 import moment from "moment"
 import {
   Dialog,
@@ -38,7 +38,8 @@ export function CalendarSync({ goals }: CalendarSyncProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
 
-  const formatGoalsForCalendar = () => {
+  // Add proper typing for the events
+  const formatGoalsForCalendar = (): Event[] => {
     return Object.values(goals)
       .flat()
       .map((goal) => ({

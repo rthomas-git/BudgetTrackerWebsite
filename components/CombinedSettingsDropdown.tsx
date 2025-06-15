@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Moon, Sun, Settings, HelpCircle } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
@@ -18,7 +18,7 @@ export function CombinedSettingsDropdown() {
   const [mounted, setMounted] = useState(false)
 
   // useEffect only runs on the client, so now we can safely show the UI
-  useState(() => {
+  useEffect(() => {
     setMounted(true)
   }, [])
 

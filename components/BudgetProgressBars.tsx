@@ -28,7 +28,7 @@ interface BudgetProgressBarsProps {
   income: number
   budgetCategories: BudgetCategory[]
   expenses: Expense[]
-  onUpdateCategory?: (index: number, updatedCategory: BudgetCategory) => void
+  onUpdateCategory: (index: number, updatedCategory: BudgetCategory) => void
 }
 
 export default function BudgetProgressBars({
